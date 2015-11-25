@@ -1,0 +1,214 @@
+﻿<%-- 
+Name: TableRepository.cs.cst
+Author: Keith Stone
+Description: Generates the DNN Angular Controller Class
+Revision: 2015.05.03
+Note: For the latest version of this template, http://www.crewstone.com		
+--%>
+<%@ CodeTemplate Language="C#" Src="DNNMaster.CodeBehind.cs" Inherits="_Main" TargetLanguage="JavaScript" Description="Generates the DNN TableRepository Class for C#" Debug="True" %>
+<%@ Property Category="Naming Convention" Name="ModuleName" Type="System.String" Default="YourModule" Description="Module Name" %>
+<%@ Property Category="Naming Convention" Name="FriendlyName" Type="System.String" Default="Your Module" Description="Descriptive module name" %>
+<%@ Property Category="Naming Convention" Name="Namespace" Type="System.String" Default="Namespace" Description="Used to generate the Namespace declaration, no spaces or punctuation" %>
+<%@ Property Category="Naming Convention" Name="CompanyName" Type="System.String" Default="YourCompany" Description="Descriptive name to generate the copyright declaration and documentation." %>
+<%@ Property Category="DataSource" Name="SourceTable" Type="SchemaExplorer.TableSchema" Description="Table that the object is based on." %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Assembly Name="System.Data" %>
+<%@ Assembly Name="CodeSmith.BaseTemplates" %>
+<%@ Assembly Name="CodeSmith.CustomProperties" %>
+<%@ Import Namespace="SchemaExplorer" %>
+<%@ Import Namespace="System.Data" %>
+
+var <%= Namespace.ToLower() %> = <%= Namespace.ToLower() %> || {};
+
+<%= Namespace.ToLower() %>.<%= GetTableName(SourceTable) %>App = angular.module("<%= Namespace.ToLower() %>.<%= GetTableName(SourceTable) %>App", ['ngDialog']);
+
+/*
+* <%= GetTableName(SourceTable).ToUpper() %> CONTROLLER
+* Parameters like $scope and $window are injected through the DI of angular
+*
+* $scope: An object referring to the application model. It is an execution context for expressions
+* $window: A jQuery (lite)-wrapped reference to window
+* $log: Simple service for logging. Default implementation safely writes the message into the browser's console (if present).
+* ngDialog: Modals and popups provider for Angular.js applications
+* dnnServiceClient: Our custom dnnService framework client factory 
+*/
+<%= Namespace.ToLower() %>.<%= GetTableName(SourceTable) %>App.controller("<%= GetTableName(SourceTable) %>Controller", function ($scope, $window, $log, ngDialog, dnnServiceClient) {
+    $scope.<%= GetTableName(SourceTable) %>s = [];
+    $scope.AddEditTitle = "";
+    $scope.EditIndex = -1;
+    $scope.Searched = false;
+    $scope.UserList = <%= Namespace.ToLower() %>.UserList;
+
+    $scope.<%= GetTableName(SourceTable) %> = {
+        <% if (SourceTable.HasPrimaryKey) {
+              foreach (ColumnSchema column in SourceTable.PrimaryKey.MemberColumns) { %>
+		<%= column.Name %> : 0,
+		<%    } 
+           } %>
+		<% foreach (ColumnSchema column in SourceTable.NonPrimaryKeyColumns) { %>
+		<%= column.Name %> : '',
+		<% } %> 
+        LastField: ''
+    };
+
+    $scope.getAll = function () {
+        var promiseResp = dnnServiceClient.callGetService("<%= GetTableName(SourceTable).ToLower() %>/list");
+        promiseResp.then(
+            function (payload) {
+                $scope.<%= GetTableName(SourceTable) %>s = payload.data;
+            },
+            function (errorPayload) {
+                $log.error('failure loading <%= GetTableName(SourceTable) %>s', errorPayload);
+            }
+        );
+    }
+
+    $scope.createUpdate<%= GetTableName(SourceTable) %> = function (form) {
+        $scope.invalidSubmitAttempt = false;
+        if (form.$invalid) {
+            $scope.invalidSubmitAttempt = true;
+            return;
+        }
+        var sMethod = null;
+
+        if ($scope.<%= GetTableName(SourceTable) %>.<%= GetPrimaryKeyName(SourceTable) %> > 0) { sMethod = "<%= GetTableName(SourceTable).ToLower() %>/edit"; }
+        else { sMethod = "<%= GetTableName(SourceTable).ToLower() %>/new"; }
+
+        var promiseResp = dnnServiceClient.callPostService(sMethod, angular.toJson($scope.<%= GetTableName(SourceTable) %>));
+        promiseResp.then(
+            function (payload) {
+                if (sMethod === "<%= GetTableName(SourceTable).ToLower() %>/new") {
+                    var id = parseInt(payload.data);
+                    if (id > 0) {
+                        $scope.<%= GetTableName(SourceTable) %>.<%= GetPrimaryKeyName(SourceTable) %> = id;
+                        $scope.<%= GetTableName(SourceTable) %>s.push($scope.<%= GetTableName(SourceTable) %>);
+                    }
+                } else {
+                    if ($scope.EditIndex >= 0)
+                        $scope.<%= GetTableName(SourceTable) %>s[$scope.EditIndex] = $scope.<%= GetTableName(SourceTable) %>;
+                }
+            },
+            function (errorPayload) {
+                $log.error('failure saving <%= GetTableName(SourceTable) %>', errorPayload);
+            }
+        );
+        ngDialog.close();
+    }
+
+    $scope.delete<%= GetTableName(SourceTable) %> = function (<%= GetTableName(SourceTable) %>, idx) {
+        if (confirm('Are you sure to delete "' + <%= GetTableName(SourceTable) %>.<%= GetFirstTextField(SourceTable) %> + '"?')) {
+            var promiseResp = dnnServiceClient.callPostService("<%= GetTableName(SourceTable).ToLower() %>/delete", angular.toJson(<%= GetTableName(SourceTable) %>));
+            promiseResp.then(
+                function (payload) {
+                    $scope.<%= GetTableName(SourceTable) %>s.splice(idx, 1);
+                },
+                function (errorPayload) {
+                    $log.error('failure deleting <%= GetTableName(SourceTable) %>', errorPayload);
+                }
+            );
+        }
+    }
+
+    $scope.showAdd = function () {
+        $scope.reset();
+        $scope.AddEditTitle = "Add <%= GetTableName(SourceTable) %>";
+        ngDialog.open({
+            template: 'pnlAddEdit<%= GetTableName(SourceTable) %>',
+            className: 'ngdialog-theme-default',
+            scope: $scope
+        });
+    }
+
+    $scope.showEdit = function (<%= GetTableName(SourceTable) %>, idx) {
+        $scope.<%= GetTableName(SourceTable) %> = angular.copy(<%= GetTableName(SourceTable) %>);
+        $scope.EditIndex = idx;
+        $scope.AddEditTitle = "Edit <%= GetTableName(SourceTable) %>: #" + <%= GetTableName(SourceTable) %>.<%= GetPrimaryKeyName(SourceTable) %>;
+        ngDialog.open({
+            template: 'pnlAddEdit<%= GetTableName(SourceTable) %>',
+            className: 'ngdialog-theme-default',
+            scope: $scope
+        });
+    }
+
+    $scope.reset = function () {
+        $scope.<%= GetTableName(SourceTable) %>  = {
+        <% if (SourceTable.HasPrimaryKey) {
+              foreach (ColumnSchema column in SourceTable.PrimaryKey.MemberColumns) { %>
+		<%= column.Name %> : 0,
+		<%    } 
+           } %>
+		<% foreach (ColumnSchema column in SourceTable.NonPrimaryKeyColumns) { %>
+		<%= column.Name %> : '',
+		<% } %> 
+        LastField: ''
+        }
+    }
+
+    $scope.initUser = function () {
+        $scope.<%= GetTableName(SourceTable) %>.AssignedUserSel = $scope.<%= GetTableName(SourceTable) %>.AssignedUserId.toString();
+    }
+    $scope.changeUser = function () {
+        $scope.<%= GetTableName(SourceTable) %>.AssignedUserId = parseInt($scope.<%= GetTableName(SourceTable) %>.AssignedUserSel.id);
+    }
+
+    $scope.clearSearch = function () {
+        $scope.getAll();
+        $scope.Query = "";
+        $scope.Searched = false;
+    }
+
+    $scope.search<%= GetTableName(SourceTable) %>s = function () {
+        var req = { Term: $scope.Query, PageSize: 10, PageNum: 1, ModuleId: $scope.ModuleId };
+        var promiseResp = dnnServiceClient.callPostService("<%= GetTableName(SourceTable).ToLower() %>/search", angular.toJson(req));
+        promiseResp.then(
+            function (payload) {
+                $scope.<%= GetTableName(SourceTable) %>s = payload.data;
+                $scope.SearchMessage = payload.data.length + " <%= GetTableName(SourceTable) %>s found matching search term '" + $scope.Query + "'";
+                $scope.Searched = true;
+            },
+            function (errorPayload) {
+                $log.error('failure deleting <%= GetTableName(SourceTable) %>', errorPayload);
+            }
+        );
+    }
+
+    $scope.init = function (moduleId, moduleName, editable) {
+        $scope.ModuleId = moduleId;
+        $scope.EditMode = editable;
+        dnnServiceClient.init(moduleId, moduleName);
+        $scope.getAll();
+    }
+});
+
+<%= Namespace.ToLower() %>.<%= GetTableName(SourceTable) %>App.factory("dnnServiceClient", ['$http', function ($http) {
+    $self = this;
+
+    return {
+        init: function (moduleId, moduleName) {
+            if ($.ServicesFramework) {
+                var _sf = $.ServicesFramework(moduleId);
+                $self.ServiceRoot = _sf.getServiceRoot(moduleName);
+                $self.Headers = {
+                    "ModuleId": moduleId,
+                    "TabId": _sf.getTabId(),
+                    "RequestVerificationToken": _sf.getAntiForgeryValue()
+                };
+            }
+        },
+        callGetService: function (method) {
+            return $http({
+                method: 'GET',
+                url: $self.ServiceRoot + method,
+                headers: $self.Headers
+            });
+        },
+        callPostService: function (method, data) {
+            return $http({
+                method: 'POST',
+                url: $self.ServiceRoot + method,
+                headers: $self.Headers,
+                data: data
+            });
+        }
+    }
+}]);
